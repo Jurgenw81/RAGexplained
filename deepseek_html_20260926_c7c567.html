@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG from start to end · Retrieval‑Augmented Generation</title>
+  <style>
+    /* ---------- global ---------- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f9fafc;
+      color: #1e293b;
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 2.5rem;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      padding: 2rem 2.5rem 3rem;
+    }
+
+    /* ---------- typography ---------- */
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #0f172a, #3b82f6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+      line-height: 1.2;
+    }
+
+    .subhead {
+      font-size: 1.25rem;
+      color: #475569;
+      margin-bottom: 2.5rem;
+      border-left: 5px solid #3b82f6;
+      padding-left: 1.5rem;
+      font-weight: 400;
+    }
+
+    h2 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 2.5rem 0 1rem;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    h2 .emoji-badge {
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 1.75rem 0 0.75rem;
+      color: #1e293b;
+    }
+
+    p, li {
+      color: #334155;
+    }
+
+    .highlight {
+      background: #eff6ff;
+      border-radius: 1rem;
+      padding: 0.25rem 0.75rem;
+      font-weight: 500;
+      color: #1e40af;
+      display: inline-block;
+    }
+
+    /* ---------- flow diagram ---------- */
+    .rag-flow {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 0.75rem 1.5rem;
+      margin: 2rem 0 2.5rem;
+      background: #f8fafc;
+      padding: 2rem 1.5rem;
+      border-radius: 2rem;
+      border: 1px solid #e2e8f0;
+    }
+
+    .flow-step {
+      background: white;
+      border-radius: 1.5rem;
+      padding: 1rem 1.75rem;
+      box-shadow: 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      font-weight: 600;
+      border: 1px solid #dbeafe;
+      color: #1e3a8a;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.1s ease;
+    }
+
+    .flow-arrow {
+      font-size: 2rem;
+      color: #94a3b8;
+      font-weight: 300;
+    }
+
+    /* ---------- cards ---------- */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e9eef3;
+      border-radius: 1.75rem;
+      padding: 1.75rem 1.5rem;
+      box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.08);
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+      border-color: #bfdbfe;
+    }
+
+    .card-icon {
+      font-size: 2.2rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .card h4 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #0f172a;
+    }
+
+    .card p {
+      font-size: 0.98rem;
+      color: #475569;
+    }
+
+    /* ---------- code / diagram blocks ---------- */
+    .code-block {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1.5rem 2rem;
+      border-radius: 1.5rem;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.95rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 1.5rem 0;
+      line-height: 1.7;
+      box-shadow: inset 0 0 0 1px #1e293b;
+    }
+
+    .code-block .key {
+      color: #93c5fd;
+    }
+
+    .code-block .value {
+      color: #fde68a;
+    }
+
+    .code-block .comment {
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    /* ---------- numbered list with custom style ---------- */
+    .steps-list {
+      list-style: none;
+      counter-reset: step-counter;
+      margin: 1.5rem 0;
+    }
+
+    .steps-list li {
+      counter-increment: step-counter;
+      margin-bottom: 1.25rem;
+      padding-left: 3.5rem;
+      position: relative;
+      font-weight: 500;
+    }
+
+    .steps-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: -0.2rem;
+      background: #3b82f6;
+      color: white;
+      font-weight: 700;
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      box-shadow: 0 4px 8px -2px #3b82f680;
+    }
+
+    /* ---------- comparison table ---------- */
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2rem 0;
+      border-radius: 1.5rem;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .compare-table th {
+      background: #1e293b;
+      color: white;
+      font-weight: 600;
+      padding: 1rem 1.5rem;
+      text-align: left;
+      font-size: 1rem;
+    }
+
+    .compare-table td {
+      padding: 1rem 1.5rem;
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .compare-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .compare-table tr:hover td {
+      background: #f1f5f9;
+    }
+
+    .badge {
+      background: #dbeafe;
+      color: #1e40af;
+      border-radius: 100px;
+      padding: 0.2rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-block;
+    }
+
+    /* ---------- footer / note ---------- */
+    .footer-note {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 2px dashed #cbd5e1;
+      text-align: center;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+
+    /* responsive */
+    @media (max-width: 640px) {
+      .page {
+        padding: 1.5rem 1.25rem 2rem;
+      }
+      h1 {
+        font-size: 2.2rem;
+      }
+      .rag-flow {
+        flex-direction: column;
+      }
+      .flow-arrow {
+        transform: rotate(90deg);
+      }
+      .steps-list li {
+        padding-left: 2.8rem;
+      }
+      .steps-list li::before {
+        width: 1.8rem;
+        height: 1.8rem;
+        font-size: 0.9rem;
+        top: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>RAG from start to end</h1>
+  <div class="subhead">
+    Retrieval‑Augmented Generation — how it works, why it matters, and every step in between.
+  </div>
+
+  <!-- visual overview -->
+  <div class="rag-flow">
+    <div class="flow-step">📄 Query</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">🔍 Retriever</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">📚 Vector DB</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">🧩 Augment</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">🤖 Generator</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-step">✅ Answer</div>
+  </div>
+
+  <!-- 1. what is RAG -->
+  <h2><span class="emoji-badge">🧠</span> 1. What is RAG?</h2>
+  <p style="font-size:1.1rem; margin-bottom:1rem;">
+    <span class="highlight">Retrieval‑Augmented Generation (RAG)</span> is a technique that gives large language models (LLMs) 
+    access to external, up‑to‑date, or private knowledge <em>without</em> retraining. Instead of relying only on what the model 
+    learned during training, RAG fetches relevant documents at inference time and feeds them to the model as context.
+  </p>
+  <p>
+    Think of it as an open‑book exam: the LLM is the student, and the retriever finds the right pages from a textbook 
+    (your knowledge base) before the student writes the answer.
+  </p>
+
+  <!-- 2. why RAG -->
+  <h2><span class="emoji-badge">⚡</span> 2. Why use RAG?</h2>
+  <div class="card-grid">
+    <div class="card">
+      <span class="card-icon">🕒</span>
+      <h4>Up‑to‑date knowledge</h4>
+      <p>LLMs have a knowledge cutoff. RAG injects fresh data from databases, APIs, or documents — no fine‑tuning needed.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🔒</span>
+      <h4>Private & domain‑specific</h4>
+      <p>Use internal wikis, legal contracts, or customer support tickets without exposing them to the model during training.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🎯</span>
+      <h4>Reduced hallucinations</h4>
+      <p>Answers are grounded in retrieved evidence. The model can cite sources and say “I don’t know” when context is missing.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">💰</span>
+      <h4>Cost‑effective</h4>
+      <p>No expensive fine‑tuning or retraining cycles. Update the retrieval index, not the model weights.</p>
+    </div>
+  </div>
+
+  <!-- 3. the two main phases -->
+  <h2><span class="emoji-badge">⚙️</span> 3. Two phases: indexing & inference</h2>
+  <p>RAG systems have two distinct pipelines that work together.</p>
+
+  <h3>📦 A. Indexing (offline / pre‑processing)</h3>
+  <ul class="steps-list">
+    <li><strong>Collect documents</strong> — PDFs, web pages, databases, APIs, Notion pages, etc.</li>
+    <li><strong>Chunk</strong> — split text into manageable pieces (e.g., 200–500 tokens with overlap).</li>
+    <li><strong>Embed</strong> — convert each chunk into a vector using an embedding model (e.g., text‑embedding‑3, BGE, E5).</li>
+    <li><strong>Store</strong> — save vectors + metadata in a vector database (Pinecone, Weaviate, Qdrant, FAISS, Chroma).</li>
+  </ul>
+
+  <h3>💬 B. Inference (online / query time)</h3>
+  <ul class="steps-list">
+    <li><strong>Receive query</strong> — user asks a question.</li>
+    <li><strong>Embed query</strong> — same embedding model as indexing.</li>
+    <li><strong>Retrieve</strong> — find top‑k most similar chunks (cosine similarity, dot product, etc.).</li>
+    <li><strong>Augment prompt</strong> — insert retrieved chunks into the LLM’s context window.</li>
+    <li><strong>Generate</strong> — LLM produces an answer grounded in the retrieved context.</li>
+  </ul>
+
+  <!-- 4. deep dive: each component -->
+  <h2><span class="emoji-badge">🔬</span> 4. Inside the pipeline</h2>
+
+  <h3>📄 Chunking strategies</h3>
+  <div class="card-grid">
+    <div class="card">
+      <h4>Fixed‑size</h4>
+      <p>Split by token/character count with overlap. Simple but may cut sentences.</p>
+    </div>
+    <div class="card">
+      <h4>Recursive</h4>
+      <p>Split by paragraphs → sentences → words. Preserves semantic boundaries better.</p>
+    </div>
+    <div class="card">
+      <h4>Semantic</h4>
+      <p>Use embeddings to detect topic shifts. Higher quality, more compute.</p>
+    </div>
+  </div>
+
+  <h3>🧮 Embedding models</h3>
+  <p>They map text to high‑dimensional vectors where similar meanings are close together.  
+  Popular choices: <span class="badge">OpenAI text‑embedding‑3‑small</span> 
+  <span class="badge">BGE‑large</span> <span class="badge">E5‑mistral</span> 
+  <span class="badge">Cohere Embed v3</span>.</p>
+
+  <h3>🗂️ Vector databases</h3>
+  <p>Specialized stores for efficient similarity search. Options: <strong>Pinecone</strong> (managed), 
+  <strong>Qdrant</strong> (open‑source), <strong>FAISS</strong> (library), <strong>Chroma</strong> (lightweight), 
+  <strong>Weaviate</strong> (hybrid search), <strong>pgvector</strong> (Postgres extension).</p>
+
+  <!-- code block example -->
+  <div class="code-block">
+    <span class="comment"># simple RAG inference flow (pseudo‑code)</span><br>
+    query = <span class="value">"How does RAG reduce hallucinations?"</span><br>
+    query_vec = embed(query)<br>
+    chunks = vector_db.search(query_vec, top_k=<span class="value">5</span>)<br>
+    context = <span class="value">"\n\n".join</span>(chunks)<br>
+    prompt = <span class="value">f"""Answer based only on this context:</span><br>
+    <span class="value">{context}</span><br>
+    <span class="value">Question: {query}"""</span><br>
+    answer = llm.generate(prompt)
+  </div>
+
+  <!-- 5. advanced variations -->
+  <h2><span class="emoji-badge">🧬</span> 5. Advanced RAG patterns</h2>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Pattern</th><th>How it works</th><th>Best for</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Naive RAG</strong></td><td>Retrieve → augment → generate (basic).</td><td>Simple Q&A, prototypes.</td></tr>
+      <tr><td><strong>Hybrid RAG</strong></td><td>Combine vector search + keyword (BM25) for better recall.</td><td>Technical docs, legal text.</td></tr>
+      <tr><td><strong>Multi‑query RAG</strong></td><td>Generate multiple query variants, retrieve for each, merge results.</td><td>Ambiguous or complex questions.</td></tr>
+      <tr><td><strong>Reranking</strong></td><td>Retrieve top‑50, then use a cross‑encoder to re‑order the best chunks.</td><td>High precision needs.</td></tr>
+      <tr><td><strong>Self‑RAG</strong></td><td>LLM critiques its own retrieval & generation, loops if needed.</td><td>High‑stakes answers.</td></tr>
+      <tr><td><strong>Graph RAG</strong></td><td>Use knowledge graphs to traverse relationships between entities.</td><td>Multi‑hop reasoning.</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 6. challenges & best practices -->
+  <h2><span class="emoji-badge">⚠️</span> 6. Challenges & best practices</h2>
+  <div class="card-grid">
+    <div class="card">
+      <h4>Retrieval quality</h4>
+      <p>Garbage in → garbage out. Use good chunking, hybrid search, and reranking to surface relevant context.</p>
+    </div>
+    <div class="card">
+      <h4>Context length</h4>
+      <p>Too many chunks → lost in the middle. Keep top‑k small (3–8) and use reranking.</p>
+    </div>
+    <div class="card">
+      <h4>Freshness</h4>
+      <p>Re‑index regularly or use change data capture (CDC) to keep the vector store updated.</p>
+    </div>
+    <div class="card">
+      <h4>Evaluation</h4>
+      <p>Measure retrieval (recall@k, MRR) and generation (faithfulness, answer relevance). Use RAGAS or TruLens.</p>
+    </div>
+  </div>
+
+  <!-- 7. end-to-end summary -->
+  <h2><span class="emoji-badge">🚀</span> 7. RAG from start to end — summary</h2>
+  <ol class="steps-list" style="counter-reset: step-counter; list-style: none;">
+    <li><strong>Ingest</strong> — load documents from any source.</li>
+    <li><strong>Chunk</strong> — split into meaningful pieces.</li>
+    <li><strong>Embed</strong> — vectorise each chunk.</li>
+    <li><strong>Store</strong> — persist vectors + metadata in a vector DB.</li>
+    <li><strong>Query</strong> — user asks a question.</li>
+    <li><strong>Embed query</strong> — same model as indexing.</li>
+    <li><strong>Retrieve</strong> — find top‑k nearest chunks.</li>
+    <li><strong>Augment</strong> — build a prompt with context.</li>
+    <li><strong>Generate</strong> — LLM produces the final answer.</li>
+    <li><strong>Iterate</strong> — evaluate, refine, and improve.</li>
+  </ol>
+
+  <p style="margin-top:2rem; font-size:1.1rem; background: #f0f9ff; padding: 1.5rem; border-radius: 1.5rem; border-left: 8px solid #3b82f6;">
+    <strong>💡 The key takeaway:</strong> RAG connects a retriever (which knows <em>where</em> to find information) 
+    with a generator (which knows <em>how</em> to express it). This combination makes LLMs more accurate, 
+    transparent, and adaptable to any domain — without touching the model weights.
+  </p>
+
+  <div class="footer-note">
+    ⚡ RAG from start to end — a complete guide.<br>
+    Built for curious minds. Keep exploring.
+  </div>
+</div>
+</body>
+</html>
